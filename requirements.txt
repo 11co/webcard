@@ -1,5 +1,5 @@
 requests
+random
 pyTelegramBotAPI
 pycryptodome
-random
 telebot
